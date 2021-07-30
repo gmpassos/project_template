@@ -232,6 +232,19 @@ content: 'Hello!'
 
       var map = template.resolveToJsonMap(variables);
 
+      expect(
+          template.parseTemplateVariables(),
+          equals({
+            'root',
+            'pack',
+            'fid',
+            'hello',
+            'map/a',
+            'map/b',
+            'list/0',
+            'list/1'
+          }));
+
       var expectedJson = [
         {
           'directory': '',
@@ -250,6 +263,21 @@ content: 'Hello!'
       ];
 
       expect(map, equals(expectedJson));
+
+      expect(template.toYAMLEncoded(), equals('''
+- 
+  directory: ''
+  name: '___root___.txt'
+  type: 'text'
+  encode: 'text'
+  content: 'Hi!'
+- 
+  directory: '___pack___'
+  name: 'file___fid___.txt'
+  type: 'text'
+  encode: 'text'
+  content: '___hello___ Map: ___map/a___, ___map/b___ ; List: ___list/0___, ___list/1___'
+'''));
 
       var r1 = template.resolve(variables);
       expect(r1.toJsonMap(), equals(expectedJson));

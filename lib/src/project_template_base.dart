@@ -85,6 +85,17 @@ class Template {
     return jsonMap;
   }
 
+  /// Parses the template variables and returns them.
+  Set<String> parseTemplateVariables([Set<String>? variables]) {
+    variables ??= <String>{};
+
+    for (var e in _entries) {
+      e.parseTemplateVariables(variables);
+    }
+
+    return variables;
+  }
+
   /// Converts to an encode YAML [String].
   String toYAMLEncoded() => _encodeYAML(toJsonMap());
 
@@ -359,6 +370,21 @@ class TemplateEntry<D> extends FileType {
     return map;
   }
 
+  /// Parses the template variables and returns them.
+  Set<String> parseTemplateVariables([Set<String>? variables]) {
+    variables ??= <String>{};
+
+    _parseTemplateVariables(variables, directory);
+    _parseTemplateVariables(variables, name);
+    _parseTemplateVariables(variables, type);
+
+    if (content is! Uint8List) {
+      _parseTemplateVariables(variables, contentAsString);
+    }
+
+    return variables;
+  }
+
   /// Converts to an encode YAML [String].
   String toYAMLEncoded() => _encodeYAML(toJson());
 
@@ -425,6 +451,14 @@ String? _getVariable(Map<String, dynamic> variables, String varName) {
     var val = variables[varName];
     return val != null ? '$val' : null;
   }
+}
+
+void _parseTemplateVariables(Set<String> variables, String s) {
+  s.replaceAllMapped(_regExpTemplateVar, (m) {
+    var varName = m.group(1)!;
+    variables.add(varName);
+    return '';
+  });
 }
 
 String _resolveTemplateString(Map<String, dynamic> variables, String s,

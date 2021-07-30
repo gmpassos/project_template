@@ -66,6 +66,3 @@ Graciliano M. Passos: [gmpassos@GitHub][github].
 [Apache License - Version 2.0][apache_license]
 
 [apache_license]: https://www.apache.org/licenses/LICENSE-2.0.txt
-
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Feneural-net%2Fasync_field.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Feneural-net%2Fasync_field?ref=badge_large)
-

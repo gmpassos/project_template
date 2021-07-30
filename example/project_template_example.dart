@@ -23,5 +23,15 @@ void main() async {
 
   var template = await storage.loadTemplate();
 
-  print(template.toJsonEncoded(pretty: true));
+  var templateVariables = template.parseTemplateVariables();
+
+  print('Variables: $templateVariables');
+
+  print('----------------------------------------------------');
+  print(template.toYAMLEncoded());
+
+  var templateResolved = template.resolve({'project_name': 'console_simple'});
+
+  print('----------------------------------------------------');
+  print(templateResolved.toYAMLEncoded());
 }
