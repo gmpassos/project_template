@@ -95,7 +95,7 @@ content: 'Hello!'
 
     test('contentBase64', () {
       var templateEntry = TemplateEntry.contentBase64('foo', 'file.txt', 'raw',
-          dart_convert.base64.encode('Hello!!!'.codeUnits));
+          dart_convert.base64.encode(dart_convert.utf8.encode('Hello!!!')));
       expect(
           templateEntry.toJson(),
           equals({
@@ -215,22 +215,88 @@ content: 'Hello!'
           isTrue);
     });
 
+    test('basic2', () {
+      var template = Template();
+
+      var templateEntry2 = TemplateEntry('foo', 'file1.txt', 'text', 'Hello!');
+      var templateEntry3 = TemplateEntry('foo', 'file2.txt', 'text', 'World!');
+
+      template.addEntry(templateEntry2);
+      template.addEntry(templateEntry3);
+
+      expect(template.isEmpty, isFalse);
+      expect(template.isNotEmpty, isTrue);
+      expect(template.length, equals(2));
+
+      expect(template.entries.length, equals(2));
+
+      expect(template.entriesPaths, equals({'foo/file1.txt', 'foo/file2.txt'}));
+
+      expect(template.getEntryByPath('foo/file1.txt')!.path,
+          equals('foo/file1.txt'));
+      expect(template.getEntryByPath('foo/file1.txt')!.contentAsString,
+          equals('Hello!'));
+
+      expect(template.getEntryByPath('foo/file2.txt')!.path,
+          equals('foo/file2.txt'));
+      expect(template.getEntryByPath('foo/file2.txt')!.contentAsBytes,
+          equals(dart_convert.utf8.encode('World!')));
+
+      expect(template.getEntryByPath('foo/file3.txt'), isNull);
+
+      expect(template.mainEntryPath, equals('foo'));
+
+      expect(
+          template.toJsonMap(),
+          equals([
+            {
+              'directory': 'foo',
+              'name': 'file1.txt',
+              'type': 'text',
+              'encode': 'text',
+              'content': 'Hello!'
+            },
+            {
+              'directory': 'foo',
+              'name': 'file2.txt',
+              'type': 'text',
+              'encode': 'text',
+              'content': 'World!'
+            }
+          ]));
+
+      var expectedJson = '['
+          '{"directory":"foo","name":"file1.txt","type":"text","encode":"text","content":"Hello!"},'
+          '{"directory":"foo","name":"file2.txt","type":"text","encode":"text","content":"World!"}'
+          ']';
+
+      expect(template.toJsonEncoded(), equals(expectedJson));
+
+      expect(Template.from(template.toJsonMap()) == template, isTrue);
+      expect(Template.from(template.toJsonEncoded()) == template, isTrue);
+
+      expect(
+          Template.from(template.toJsonEncoded()).hashCode == template.hashCode,
+          isTrue);
+    });
+
     test('resolve', () {
       var template = Template([
         TemplateEntry('', '___root___.txt', 'text', 'Hi!'),
         TemplateEntry('___pack___', 'file___fid___.txt', 'text',
-            '___hello___ Map: ___map/a___, ___map/b___ ; List: ___list/0___, ___list/1___')
+            '___hello___ Map: ___map/a___, ___map/b___ ; List: ___list/0___, ___list/1___'),
+        TemplateEntry('', 'project_template.json', 'text',
+            '{"root":{"description": "Root file"}, "pack":{"description": "Pack dir"}}')
       ]);
 
       var variables = {
+        'fid': 123,
         'root': 'foo-project',
         'pack': 'basic',
         'hello': 'HI!',
         'map': {'a': 1, 'b': 2},
         'list': [10, 20],
       };
-
-      var map = template.resolveToJsonMap(variables);
 
       expect(
           template.parseTemplateVariables(),
@@ -245,6 +311,21 @@ content: 'Hello!'
             'list/1'
           }));
 
+      expect(
+          template.getManifest(),
+          equals({
+            'root': {'description': 'Root file'},
+            'pack': {'description': 'Pack dir'}
+          }));
+
+      expect(template.getNotDefinedVariables(variables), equals([]));
+
+      expect(
+          template.getNotDefinedVariables(Map.from(variables)..remove('fid')),
+          equals(['fid']));
+
+      var map = template.resolveToJsonMap(variables);
+
       var expectedJson = [
         {
           'directory': '',
@@ -255,7 +336,7 @@ content: 'Hello!'
         },
         {
           'directory': 'basic',
-          'name': 'file.txt',
+          'name': 'file123.txt',
           'type': 'text',
           'encode': 'text',
           'content': 'HI! Map: 1, 2 ; List: 10, 20'
@@ -277,7 +358,15 @@ content: 'Hello!'
   type: 'text'
   encode: 'text'
   content: '___hello___ Map: ___map/a___, ___map/b___ ; List: ___list/0___, ___list/1___'
+- 
+  directory: ''
+  name: 'project_template.json'
+  type: 'text'
+  encode: 'text'
+  content: '{"root":{"description": "Root file"}, "pack":{"description": "Pack dir"}}'
 '''));
+
+      expect(template.mainEntryPath, equals(''));
 
       var r1 = template.resolve(variables);
       expect(r1.toJsonMap(), equals(expectedJson));

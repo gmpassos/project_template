@@ -1,21 +1,26 @@
 import 'dart:async';
+import 'dart:convert' as dart_convert;
 import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:project_template/project_template.dart';
+import 'package:project_template/src/project_template_storage_io.dart';
+import 'package:yaml/yaml.dart';
+import 'package:yaml_writer/yaml_writer.dart';
 
 void _log(String ns, String message) {
   print('## [$ns]\t$message');
 }
 
-const String cliTitle = '[Project_Template/${Template.VERSION}]';
+const String cliTitle = '[Project_Template/${Template.version}]';
 
 void main(List<String> args) async {
   var commandRunner =
       CommandRunner<bool>('project_template', '$cliTitle - CLI Tool')
-        ..addCommand(CommandServe())
-        ..addCommand(CommandConsole());
+        ..addCommand(CommandInfo())
+        ..addCommand(CommandCreate())
+        ..addCommand(CommandPrepare());
 
   commandRunner.argParser.addFlag('version',
       abbr: 'v', negatable: false, defaultsTo: false, help: 'Show version.');
@@ -29,44 +34,25 @@ void main(List<String> args) async {
     }
   }
 
-  await commandRunner.run(args);
+  var ok = (await commandRunner.run(args)) ?? false;
+
+  exit(ok ? 0 : 1);
 }
 
 void showVersion() {
-  print('Project_Template/${Template.VERSION} - CLI Tool');
+  print('Project_Template/${Template.version} - CLI Tool');
 }
 
-abstract class CommandSourceFileBase extends Command<bool> {
+abstract class CommandBase extends Command<bool> {
   final _argParser = ArgParser(allowTrailingOptions: false);
 
   @override
   ArgParser get argParser => _argParser;
 
-  CommandSourceFileBase() {
-    argParser.addFlag('verbose',
-        abbr: 'v', help: 'Verbose mode', defaultsTo: false, negatable: false);
-
-    argParser.addOption(
-      'directory',
-      abbr: 'd',
-      help: 'Project directory.\n'
-          '(defaults to current directory)',
-    );
-  }
-
-  String? get argDirectory => argResults!['directory'];
-
   @override
   String get usage {
     var s = super.usage;
     return '$cliTitle\n\n($name) :: $s';
-  }
-
-  bool? _verbose;
-
-  bool get verbose {
-    _verbose ??= argResults!['verbose'] as bool;
-    return _verbose!;
   }
 
   int get parametersStartIndex => 0;
@@ -88,199 +74,382 @@ abstract class CommandSourceFileBase extends Command<bool> {
     return index < params.length ? params[index] : def;
   }
 
-  String get sourceFilePath {
-    var argResults = this.argResults!;
+  bool hasError = false;
 
-    if (argResults.rest.isEmpty) {
-      throw StateError('Empty arguments: no source file path!');
-    }
-
-    return argResults.rest[0];
+  void showError(String message) {
+    _log('ERROR', message);
+    hasError = true;
   }
 
-  File get sourceFile => File(sourceFilePath);
+  void showErrorOptionNotProvided(String option) {
+    showError('Option `$option` not provided.');
+  }
 
-  String get source => sourceFile.readAsStringSync();
+  String readFile(String filePath) => File(filePath).readAsStringSync();
+
+  Future<Template> loadTemplate(String templatePath,
+      {List<String>? ignorePath, List<Pattern>? ignoreRegexp}) async {
+    var templatePathLC = templatePath.toLowerCase();
+
+    if (templatePathLC.endsWith('.json')) {
+      var data = readFile(templatePath);
+      var json = dart_convert.json.decode(data);
+      return Template.fromJson(json);
+    } else if (templatePathLC.endsWith('.yaml') ||
+        templatePathLC.endsWith('.yml')) {
+      var data = readFile(templatePath);
+      var yaml = loadYaml(data);
+      return Template.fromJson(yaml);
+    } else {
+      var storage = StorageIO.directoryPath(templatePath);
+
+      if (ignorePath != null) {
+        storage.ignorePaths.addAll(ignorePath);
+      }
+
+      if (ignoreRegexp != null) {
+        storage.ignorePaths.addAll(ignoreRegexp);
+      }
+
+      print('');
+
+      if (storage.ignorePaths.isNotEmpty) {
+        print('-- Template ignorePaths(${storage.ignorePaths.length}):');
+        for (var e in storage.ignorePaths) {
+          print('   $e');
+        }
+        print('');
+      }
+
+      print('-- Loading template:\n   ${storage.root.path}');
+
+      return await storage.loadTemplate();
+    }
+  }
 }
 
-class CommandServe extends CommandSourceFileBase {
-  @override
-  final String description = 'Serve an API';
+abstract class CommandTemplateBase extends CommandBase {
+  CommandTemplateBase({bool allowIgnoreOptions = true}) {
+    if (allowIgnoreOptions) {
+      argParser.addMultiOption(
+        'ignore',
+        abbr: 'i',
+        help: 'Ignore a path from template directory.',
+        valueHelp: 'dir/file.txt',
+      );
 
-  @override
-  final String name = 'serve';
-
-  CommandServe() {
-    argParser.addOption('address',
-        abbr: 'a',
-        help: 'Server bind address',
-        defaultsTo: 'localhost',
-        valueHelp: 'localhost|*');
-
-    argParser.addOption('port',
-        abbr: 'p', help: 'Server listen port', defaultsTo: '8080');
-
-    argParser.addOption('class',
-        abbr: 'c', help: 'Project APIRoot Class name', defaultsTo: 'API');
+      argParser.addMultiOption(
+        'regexp',
+        abbr: 'r',
+        help: 'Ignore a path by `RegExp` from template directory.',
+        valueHelp: r'\.txt$',
+      );
+    }
   }
 
-  String? get argClass => argResults!['class'];
+  List<String>? get argIgnore => argResults!['ignore'];
 
-  String get argAddress => argResults!['address']!;
+  List<String>? get argRegExp => argResults!['regexp'];
 
-  String get argPort => argResults!['port']!;
+  List<RegExp> parseRegExp() {
+    var list = argRegExp ?? <String>[];
+    return list.map((r) => RegExp(r)).toList();
+  }
+
+  void showTemplateInfos(Template template) {
+    var templateVariables = template.parseTemplateVariables();
+
+    print('\nTEMPLATE VARIABLES:\n  ${templateVariables.join(', ')}');
+
+    var manifest = template.getManifest();
+
+    if (manifest != null) {
+      print('\nMANIFEST:');
+
+      print(
+        YAMLWriter()
+            .write(manifest)
+            .split(RegExp(r'[\r\n]'))
+            .map((l) => '  $l')
+            .join('\n'),
+      );
+    }
+  }
+}
+
+class CommandInfo extends CommandTemplateBase {
+  @override
+  final String description = 'Show information about a Template.';
+
+  @override
+  final String name = 'info';
+
+  CommandInfo() : super(allowIgnoreOptions: false) {
+    argParser.addOption(
+      'template',
+      abbr: 't',
+      help: 'Template to use.',
+      valueHelp: './template_dir|template.yaml|template.json',
+    );
+  }
+
+  String? get argTemplate => argResults!['template'];
+
+  @override
+  FutureOr<bool> run() async {
+    var templatePath = argTemplate;
+
+    if (templatePath == null) {
+      showErrorOptionNotProvided('template');
+    }
+
+    if (hasError) {
+      return false;
+    }
+
+    print(cliTitle);
+
+    print('\nTEMPLATE:\n  $templatePath');
+
+    var template = await loadTemplate(templatePath!);
+
+    var entriesPaths = template.entriesPaths;
+
+    print('\nENTRIES(${entriesPaths.length}):');
+
+    for (var e in entriesPaths) {
+      print('  > $e');
+    }
+
+    showTemplateInfos(template);
+
+    return true;
+  }
+}
+
+class CommandCreate extends CommandTemplateBase {
+  @override
+  final String description =
+      'Create/build a project (file tree) from a Template.';
+
+  @override
+  final String name = 'create';
+
+  CommandCreate() {
+    argParser.addOption(
+      'template',
+      abbr: 't',
+      help: 'Template to use.',
+      valueHelp: './template_dir|template.yaml|template.json',
+    );
+
+    argParser.addOption(
+      'output',
+      abbr: 'o',
+      help: 'Output directory.',
+    );
+
+    argParser.addMultiOption(
+      'property',
+      abbr: 'p',
+      help: 'Define a template property/variable.',
+      valueHelp: 'varName=X',
+    );
+  }
+
+  String? get argTemplate => argResults!['template'];
+
+  String? get argOutput => argResults!['output'];
+
+  List<String>? get argProperties => argResults!['property'];
+
+  Map<String, String> parseProperties() {
+    var list = argProperties ?? <String>[];
+
+    var entries = list.map((e) {
+      var idx = e.indexOf('=');
+      String k, v;
+      if (idx >= 0) {
+        k = e.substring(0, idx);
+        v = e.substring(idx + 1);
+      } else {
+        k = e;
+        v = 'true';
+      }
+
+      return MapEntry(k, v);
+    });
+
+    return Map.fromEntries(entries);
+  }
+
+  @override
+  FutureOr<bool> run() async {
+    var templatePath = argTemplate;
+    var output = argOutput;
+    var ignore = argIgnore;
+    var regexp = parseRegExp();
+    var properties = parseProperties();
+
+    if (templatePath == null || templatePath.isEmpty) {
+      showErrorOptionNotProvided('template');
+    }
+
+    late Directory outputDir;
+    if (output == null || output.isEmpty) {
+      showErrorOptionNotProvided('output');
+    } else {
+      outputDir = Directory(output).absolute;
+      if (outputDir.existsSync()) {
+        showError('Output directory already exists: $output');
+      }
+    }
+
+    if (properties.isEmpty) {
+      _log('WARNING',
+          'Empty template properties. Use `-p varName=X` to define properties/variables.');
+    }
+
+    if (hasError) {
+      return false;
+    }
+
+    print(cliTitle);
+
+    print('\nTEMPLATE:\n  $templatePath');
+
+    var template = await loadTemplate(templatePath!,
+        ignorePath: ignore, ignoreRegexp: regexp);
+
+    showTemplateInfos(template);
+
+    print('\nDEFINED PROPERTIES:');
+
+    for (var e in properties.entries) {
+      print('  - ${e.key}: ${e.value}');
+    }
+
+    var notPresentVars = template.getNotDefinedVariables(properties);
+
+    if (notPresentVars.isNotEmpty) {
+      print('');
+      _log('ERROR', 'Missing properties: ${notPresentVars.join(', ')}');
+      return false;
+    }
+
+    print('\nOUTPUT:\n  ${outputDir.path}');
+
+    print('\n-- Resolving template...');
+    var resolvedTemplate = template.resolve(properties);
+
+    outputDir.createSync(recursive: true);
+
+    var storage = StorageIO(outputDir);
+
+    var savedFiles = await resolvedTemplate.saveTo(storage);
+
+    print('\nSAVED FILES(${savedFiles.length}):');
+    for (var f in savedFiles) {
+      print('  > $f');
+    }
+
+    var mainEntryPath = resolvedTemplate.mainEntryPath;
+
+    print('\n-- mainEntryPath: $mainEntryPath');
+
+    print('\n-- Template generated at: ${storage.root.path}');
+
+    print('');
+
+    return true;
+  }
+}
+
+class CommandPrepare extends CommandTemplateBase {
+  @override
+  final String description =
+      'Prepare a Template directory to a YAML or JSON template file.';
+
+  @override
+  final String name = 'prepare';
+
+  CommandPrepare() {
+    argParser.addOption(
+      'directory',
+      abbr: 'd',
+      help: 'Template source directory.',
+      valueHelp: './template_source_dir',
+    );
+
+    argParser.addOption(
+      'output',
+      abbr: 'o',
+      help: 'Template output file.',
+      valueHelp: 'template.yaml|template.json',
+    );
+  }
+
+  String? get argDirectory => argResults!['directory'];
+
+  String? get argOutput => argResults!['output'];
 
   @override
   FutureOr<bool> run() async {
     var directory = argDirectory;
-    var apiRootClass = argClass;
-    var address = argAddress;
-    var port = argPort;
+    var output = argOutput;
+    var ignore = argIgnore;
+    var regexp = parseRegExp();
 
     if (directory == null) {
-      throw ArgumentError.notNull('directory');
+      showErrorOptionNotProvided('directory');
     }
 
-    if (apiRootClass == null) {
-      throw ArgumentError.notNull('apiRootClass');
+    if (output == null) {
+      showErrorOptionNotProvided('output');
     }
 
-    if (verbose) {
-      _log('SERVE',
-          'directory: $directory ; apiRootClass: $apiRootClass ; address: $address ; port: $port');
+    File outputFile = File(output!).absolute;
+
+    if (outputFile.existsSync()) {
+      showError("Output File already exists: $outputFile");
     }
+
+    if (hasError) {
+      return false;
+    }
+
+    print(cliTitle);
+
+    print('\nTEMPLATE:\n  $directory');
+
+    var template = await loadTemplate(directory!,
+        ignorePath: ignore, ignoreRegexp: regexp);
+
+    print('\nENTRIES(${template.length}):');
+    for (var e in template.entriesPaths) {
+      print('  > $e');
+    }
+
+    showTemplateInfos(template);
+
+    var ext = TemplateEntry.parseNameExtension(output).toLowerCase();
+
+    String encoded;
+    String format;
+    if (ext == 'yml' || ext == 'yaml') {
+      encoded = template.toYAMLEncoded();
+      format = 'YAML';
+    } else {
+      encoded = template.toJsonEncoded(pretty: true);
+      format = 'JSON';
+    }
+
+    print('\n-- Format: $format');
+
+    outputFile.writeAsStringSync(encoded);
+
+    print('\n-- Saved Template at: ${outputFile.path}\n');
 
     return true;
-  }
-
-  String buildDartScript(int isolateID, String projectPackageName,
-      String projectLibraryName, String apiRootClass) {
-    var script = '''
-import 'package:bones_api/bones_api_server.dart';
-import 'package:bones_api/bones_api_dart_spawner.dart';
-
-import 'package:$projectPackageName/$projectLibraryName.dart';
-
-void main(List<String> args, dynamic parentPort) {
-  spawnedMain(args, parentPort, $isolateID, (args) async {
-    var address = args[0];
-    var port = int.parse(args[1]); 
-    
-    var api = $apiRootClass();
-    
-    var apiServer = APIServer(api, address, port);
-    await apiServer.start();
-    
-    print('------------------------------------------------------------------');
-    print('- API Package: $projectPackageName/$projectLibraryName');
-    print('- API Class: $apiRootClass\\n');
-    print('Running \$apiServer');
-    print('URL: \${ apiServer.url }');
-    
-    await apiServer.waitStopped();
-  });
-}
-    ''';
-
-    return script;
-  }
-}
-
-class CommandConsole extends CommandSourceFileBase {
-  @override
-  final String description = 'API Console';
-
-  @override
-  final String name = 'console';
-
-  CommandConsole() {
-    argParser.addOption('class',
-        abbr: 'c', help: 'Project APIRoot Class name', defaultsTo: 'API');
-  }
-
-  String? get argClass => argResults!['class'];
-
-  @override
-  FutureOr<bool> run() async {
-    var directory = argDirectory;
-    var apiRootClass = argClass;
-
-    if (directory == null) {
-      throw ArgumentError.notNull('directory');
-    }
-
-    if (apiRootClass == null) {
-      throw ArgumentError.notNull('apiRootClass');
-    }
-
-    if (verbose) {
-      _log('CONSOLE', 'directory: $directory ; apiRootClass: $apiRootClass');
-    }
-
-    return true;
-  }
-
-  String buildDartScript(int isolateID, String projectPackageName,
-      String projectLibraryName, String apiRootClass) {
-    var script = '''
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:bones_api/bones_api_console.dart';
-import 'package:bones_api/bones_api_dart_spawner.dart';
-
-import 'package:$projectPackageName/$projectLibraryName.dart';
-
-Stream<String> _stdinLineStreamBroadcaster = stdin
-    .transform(utf8.decoder)
-    .transform(const LineSplitter())
-    .asBroadcastStream();
-
-Future<String> _readStdinLine() async {
-  stdout.write('CMD> ');
-  
-  var lineCompleter = Completer<String>();
-
-  var listener = _stdinLineStreamBroadcaster.listen((line) {
-    if (!lineCompleter.isCompleted) {
-      lineCompleter.complete(line);
-    }
-  });
-
-  return lineCompleter.future.then((line) {
-    listener.cancel();
-    return line;
-  });
-}
-
-void _onRequest(APIRequest request) {
-  print('>> REQUEST: \$request');
-}
-
-void _onResponse(APIResponse response) {
-  print('>> RESPONSE: \${response.toInfos()}\\n\$response');
-}
-
-void main(List<String> args, dynamic parentPort) {
-  spawnedMain(args, parentPort, $isolateID, (args) async {
-    var api = $apiRootClass();
-    
-    var apiConsole = APIConsole(api);
-    
-    await Future.delayed(Duration(milliseconds: 100));
-    
-    print('------------------------------------------------------------------');
-    print('- API Package: $projectPackageName/$projectLibraryName');
-    print('- API Class: $apiRootClass\\n');
-    
-    print('Running \$apiConsole\\n');
-    
-    await apiConsole.run(_readStdinLine, onRequest: _onRequest, onResponse: _onResponse);
-  });
-}
-    ''';
-
-    return script;
   }
 }

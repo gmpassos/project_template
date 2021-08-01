@@ -3,13 +3,14 @@ import 'dart:typed_data';
 
 import 'package:collection/collection.dart' show SetEquality;
 import 'package:path/path.dart' as pack_path;
+import 'package:yaml/yaml.dart';
 import 'package:yaml_writer/yaml_writer.dart';
 
 import 'project_template_storage.dart';
 
 /// A Template tree.
 class Template {
-  static const String VERSION = '1.0.0';
+  static const String version = '1.0.0';
 
   final Set<TemplateEntry> _entries = <TemplateEntry>{};
 
@@ -40,6 +41,19 @@ class Template {
 
   /// Returns the amount of entries.
   int get length => _entries.length;
+
+  /// The main entry path/directory.
+  String? get mainEntryPath {
+    if (isEmpty) return null;
+
+    var mainDirs = _entries.map((e) => e.pathParts[0]).toSet();
+
+    if (mainDirs.length > 1) {
+      mainDirs.removeWhere((e) => e.startsWith('.'));
+    }
+
+    return mainDirs.length == 1 ? mainDirs.first : '';
+  }
 
   /// Adds an [TemplateEntry] to this template.
   void addEntry<D>(TemplateEntry<D> entry) {
@@ -80,9 +94,51 @@ class Template {
   }
 
   /// Resolves template variables to a [JSON] [Map]
-  List<Map<String, String>> resolveToJsonMap(Map<String, dynamic> variables) {
-    var jsonMap = _entries.map((e) => e.resolveToJsonMap(variables)).toList();
+  List<Map<String, String>> resolveToJsonMap(Map<String, dynamic> variables,
+      {Map<String, dynamic>? manifest}) {
+    var manifest = getManifest() ?? <String, dynamic>{};
+
+    checkDefinedVariables(variables, manifest: manifest);
+
+    var jsonMap = _entries.where((e) => !e.isManifest).map((e) {
+      return e.resolveToJsonMap(variables, manifest: manifest);
+    }).toList();
+
     return jsonMap;
+  }
+
+  /// Throws a [StateError] if not all used variables are defined by [variables].
+  /// Calls [getNotDefinedVariables] to determined not defined variables.
+  void checkDefinedVariables(Map<String, dynamic> variables,
+      {Map<String, dynamic>? manifest}) {
+    var notDefinedVariables =
+        getNotDefinedVariables(variables, manifest: manifest);
+    if (notDefinedVariables.isNotEmpty) {
+      throw StateError(
+          "Not all template variables are defined: $notDefinedVariables");
+    }
+  }
+
+  /// Returns a [List] of variables used in the template and not defined at [variables].
+  /// Calls [parseTemplateVariables] to determined used variables.
+  List<String> getNotDefinedVariables(Map<String, dynamic> variables,
+      {Map<String, dynamic>? manifest}) {
+    var parsedVars = parseTemplateVariables();
+
+    manifest ??= getManifest() ?? <String, dynamic>{};
+
+    defaultVarProvider(String varName) => manifest![varName]?['default'];
+
+    var notDefinedVars = <String>{};
+
+    for (var varName in parsedVars) {
+      if (!manifest.containsKey(varName) &&
+          _getVariable(variables, varName, defaultVarProvider) == null) {
+        notDefinedVars.add(varName);
+      }
+    }
+
+    return notDefinedVars.toList();
   }
 
   /// Parses the template variables and returns them.
@@ -94,6 +150,61 @@ class Template {
     }
 
     return variables;
+  }
+
+  /// Returns `true` if [fileName] is a `project_template` manifest.
+  ///
+  /// Possible file names:
+  /// - project_template.yaml
+  /// - project_template.yml
+  /// - project_template.json
+  ///
+  static bool isManifestFileName(String fileName) {
+    return fileName == 'project_template.yml' ||
+        fileName == 'project_template.yaml' ||
+        fileName == 'project_template.json';
+  }
+
+  /// Returns the template manifest. See [isManifestFileName].
+  Map<String, dynamic>? getManifest() {
+    var manifest = _entries.where((e) => e.isManifest).toList();
+
+    if (manifest.isEmpty) return null;
+
+    manifest.sort((a, b) => a.pathParts.length.compareTo(b.pathParts.length));
+
+    var manifestEntry = manifest.first;
+
+    var content = manifestEntry.contentAsString;
+    var ext = manifestEntry.nameExtension;
+
+    var map = <String, dynamic>{};
+
+    try {
+      switch (ext) {
+        case 'yml':
+        case 'yaml':
+          {
+            var yaml = loadYaml(content) as YamlMap;
+            map = yaml
+                .map((key, value) => MapEntry<String, dynamic>('$key', value));
+            break;
+          }
+        case 'json':
+          {
+            map = dart_convert.json.decode(content);
+            break;
+          }
+        default:
+          break;
+      }
+
+      return map;
+    } catch (e, s) {
+      print(e);
+      print(s);
+      return null;
+    }
   }
 
   /// Converts to an encode YAML [String].
@@ -153,6 +264,30 @@ class Template {
   @override
   String toString() {
     return 'Template{entries: $length}';
+  }
+
+  /// Saves to template to [storage];
+  Future<List<String>> saveTo(Storage storage, [String? destinySubPath]) async {
+    var savedFiles = <String>[];
+
+    for (var e in _entries) {
+      var dir = e.directory;
+
+      if (destinySubPath != null && destinySubPath.isNotEmpty) {
+        dir = pack_path.join(destinySubPath, dir);
+      }
+
+      var savedFile =
+          await storage.saveFileContent(dir, e.name, e.contentAsBytes);
+
+      if (savedFile != null) {
+        savedFiles.add(savedFile);
+      } else {
+        throw StateError("Can't save entry! entry: $e ; storage: $storage");
+      }
+    }
+
+    return savedFiles;
   }
 }
 
@@ -248,7 +383,7 @@ class TemplateEntry<D> extends FileType {
     if (encode == 'base64') {
       if (type == 'text') {
         var data = dart_convert.base64.decode(content);
-        var text = String.fromCharCodes(data);
+        var text = dart_convert.utf8.decode(data);
         return TemplateEntry<String>(dir, name, type, text) as TemplateEntry<D>;
       } else {
         return TemplateEntry.contentBase64(dir, name, type, content)
@@ -284,8 +419,15 @@ class TemplateEntry<D> extends FileType {
   /// Returns `true` if this entry is at root [directory] (empty directory path).
   bool get isRootEntry => directory == '';
 
+  String? _path;
+
   /// Returns the path of this entry: [directory] + '/' + [name].
-  String get path => isRootEntry ? name : '$directory/$name';
+  String get path => _path ??= isRootEntry ? name : '$directory/$name';
+
+  List<String>? _pathParts;
+
+  /// Returns [path] parts.
+  List<String> get pathParts => _pathParts ??= pack_path.split(path);
 
   /// Returns `true` if [path] matches this instances [directory] and [name].
   bool isEqualsPath(String path) {
@@ -335,15 +477,49 @@ class TemplateEntry<D> extends FileType {
     }
   }
 
+  /// The file [name] extension.
+  String get nameExtension {
+    return parseNameExtension(name);
+  }
+
+  /// Parse a file name extension.
+  static String parseNameExtension(String name) {
+    var idx = name.lastIndexOf('.');
+    return idx >= 0 ? name.substring(idx + 1) : '';
+  }
+
+  /// The [content] as [String].
   String get contentAsString {
     if (content is String) {
       return content as String;
     } else if (content is Uint8List) {
-      return String.fromCharCodes(content as Uint8List);
+      return dart_convert.utf8.decode(content as Uint8List);
+    } else if (content is List<int>) {
+      return dart_convert.utf8.decode(content as List<int>);
+    } else if (content is Iterable<int>) {
+      return dart_convert.utf8.decode((content as Iterable<int>).toList());
     } else {
       return content.toString();
     }
   }
+
+  /// The [content] as [Uint8List].
+  Uint8List get contentAsBytes {
+    if (content is Uint8List) {
+      return content as Uint8List;
+    } else if (content is List<int>) {
+      return Uint8List.fromList(content as List<int>);
+    } else if (content is Iterable<int>) {
+      return Uint8List.fromList((content as Iterable<int>).toList());
+    } else {
+      var data = dart_convert.utf8.encode(content.toString());
+      return Uint8List.fromList(data);
+    }
+  }
+
+  /// Returns `true` if this entry file [name] is a manifest.
+  /// Calls [Template.isManifestFileName].
+  bool get isManifest => Template.isManifestFileName(name);
 
   /// Resolves entry variables to a new [TemplateEntry] instance
   /// (without variables placeholders).
@@ -353,11 +529,15 @@ class TemplateEntry<D> extends FileType {
   }
 
   /// Resolves entry variables to a [JSON] [Map]
-  Map<String, String> resolveToJsonMap(Map<String, dynamic> variables) {
+  Map<String, String> resolveToJsonMap(Map<String, dynamic> variables,
+      {Map<String, dynamic>? manifest}) {
+    defaultVarProvider(String varName) => manifest![varName]?['default'];
+
     var map = {
-      'directory': _resolveTemplateString(variables, directory),
-      'name': _resolveTemplateString(variables, name),
-      'type': _resolveTemplateString(variables, type),
+      'directory':
+          _resolveTemplateString(variables, directory, defaultVarProvider),
+      'name': _resolveTemplateString(variables, name, defaultVarProvider),
+      'type': _resolveTemplateString(variables, type, defaultVarProvider),
     };
 
     if (content is Uint8List) {
@@ -365,7 +545,8 @@ class TemplateEntry<D> extends FileType {
       map['content'] = dart_convert.base64.encode(content as Uint8List);
     } else {
       map['encode'] = 'text';
-      map['content'] = _resolveTemplateString(variables, contentAsString);
+      map['content'] = _resolveTemplateString(
+          variables, contentAsString, defaultVarProvider);
     }
     return map;
   }
@@ -416,11 +597,21 @@ class TemplateEntry<D> extends FileType {
 
   @override
   int get hashCode => directory.hashCode ^ name.hashCode;
+
+  @override
+  String toString() {
+    return 'TemplateEntry{directory: $directory, name: $name}';
+  }
 }
 
 final RegExp _regExpTemplateVar = RegExp(r'___(\w+?(?:/\w+?)*?)___');
 
-String? _getVariable(Map<String, dynamic> variables, String varName) {
+typedef _DefaultVarProvider = dynamic Function(String varName);
+
+String? _getVariable(Map<String, dynamic> variables, String varName,
+    _DefaultVarProvider? defaultVarValue) {
+  defaultVarValue ??= (_) => null;
+
   if (varName.contains('/')) {
     var parts = varName.split('/');
 
@@ -440,16 +631,16 @@ String? _getVariable(Map<String, dynamic> variables, String varName) {
       if (parts.isEmpty) {
         break;
       } else if (val == null) {
-        return null;
+        return defaultVarValue(varName);
       }
 
       context = val;
     }
 
-    return val != null ? '$val' : null;
+    return val != null ? '$val' : defaultVarValue(varName);
   } else {
     var val = variables[varName];
-    return val != null ? '$val' : null;
+    return val != null ? '$val' : defaultVarValue(varName);
   }
 }
 
@@ -462,13 +653,10 @@ void _parseTemplateVariables(Set<String> variables, String s) {
 }
 
 String _resolveTemplateString(Map<String, dynamic> variables, String s,
-    [String? Function(String varName)? onUnknownVariable]) {
+    _DefaultVarProvider? defaultVarValue) {
   var resolved = s.replaceAllMapped(_regExpTemplateVar, (m) {
     var varName = m.group(1)!;
-    var val = _getVariable(variables, varName);
-    if (val == null && onUnknownVariable != null) {
-      val = onUnknownVariable(varName);
-    }
+    var val = _getVariable(variables, varName, defaultVarValue);
     val ??= '';
     return val;
   });

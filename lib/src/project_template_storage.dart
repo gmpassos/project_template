@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert' as dart_convert;
 import 'dart:typed_data';
 
 import 'package:async_extension/async_extension.dart';
@@ -70,7 +71,7 @@ abstract class Storage {
     return FileType.getExtensionType(ext);
   }
 
-  FutureOr<bool> saveFileContent(
+  FutureOr<String?> saveFileContent(
       String directoryPath, String name, Uint8List content);
 }
 
@@ -123,10 +124,10 @@ class FileStorage {
 
   FutureOr<String> getContentAsString() async {
     var bytes = await getContentAsBytes();
-    return String.fromCharCodes(bytes);
+    return dart_convert.utf8.decode(bytes);
   }
 
-  FutureOr<bool> saveAt(String rootPath) {
+  FutureOr<String?> saveAt(String rootPath) {
     var dirPath = pack_path.join(rootPath, directory);
     return getContentAsBytes().resolveMapped((content) {
       return storage.saveFileContent(dirPath, name, content);
@@ -152,7 +153,8 @@ class _MemoryFileStore extends FileStorage {
       return content;
     } else {
       var s = await getContentAsString();
-      return Uint8List.fromList(s.codeUnits);
+      var data = dart_convert.utf8.encode(s);
+      return Uint8List.fromList(data);
     }
   }
 
@@ -162,7 +164,7 @@ class _MemoryFileStore extends FileStorage {
       return content;
     } else {
       var bytes = await getContentAsBytes();
-      return String.fromCharCodes(bytes);
+      return dart_convert.utf8.decode(bytes);
     }
   }
 }
@@ -207,12 +209,12 @@ class StorageMemory extends Storage {
   }
 
   @override
-  FutureOr<bool> saveFileContent(
+  FutureOr<String?> saveFileContent(
       String directoryPath, String name, Uint8List content) {
     var filePath = _resolveFilePath(directoryPath, name);
     var file = _MemoryFileStore.relative(this, directoryPath, name, content);
     _files[filePath] = file;
-    return true;
+    return filePath;
   }
 
   @override

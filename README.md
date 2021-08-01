@@ -11,11 +11,16 @@
 [![Code size](https://img.shields.io/github/languages/code-size/gmpassos/project_template?logo=github&logoColor=white)](https://github.com/gmpassos/project_template)
 [![License](https://img.shields.io/github/license/gmpassos/project_template?logo=open-source-initiative&logoColor=green)](https://github.com/gmpassos/project_template/blob/master/LICENSE)
 
-Tool to generate project templates for any programming language or framework.
+A tool to generate project templates and file trees for any programming language or framework.
+
+# Usage
+
+The package can be used as a *__command-line interface (CLI)__* or as a *__Dart library__* to be imported
+in other projects or other CLI tools.
 
 ## CLI
 
-You can use the built-in command-line interface (CLI) `project_template`.
+You can use the built-in command-line: `project_template`
 
 To activate it globally:
 
@@ -23,17 +28,37 @@ To activate it globally:
  $> dart pub global activate project_template
 ```
 
-Now tou can use the CLI directly:
+Now you can use the CLI directly:
 
 ```bash
   $> project_template --help
 ```
 
-To list current templates:
+To prepare a Template from a directory:
 
 ```bash
-  $> project_template create -l
+  $> project_template prepare -d example/template-example -r ".DS_Store$" -o /tmp/template-x.json
 ```
+
+* -d: The template directory.
+* -r: A `RegExp` of a file path to ignore.
+* -o: The template file, to be used by `create` command (below).
+
+To show information about a template:
+
+```bash
+  $> project_template info -t /tmp/template-x.json
+```
+
+To create a file tree from a Template:
+
+```bash
+  $> project_template create -t /tmp/template-x.json -p project_name_dir=foo -p project_name=Foo -p "project_description=Foo project." -p homepage=http://foo.com -o /tmp/project-x
+```
+
+* -t: The template file.
+* -p: A template property/variable definition.
+* -o: The output directory, where the project (file tree) will be generated.
 
 ## Library Usage
 

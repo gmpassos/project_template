@@ -11,8 +11,15 @@ class StorageIO extends Storage {
 
   StorageIO(Directory root) : root = root.absolute;
 
-  StorageIO.directory(Directory parent, String subPath)
-      : this(Directory(pack_path.join(parent.path, subPath)));
+  StorageIO.directoryPath(String directoryPath)
+      : this(Directory(directoryPath));
+
+  StorageIO.directory(Directory directory, [String? subPath])
+      : this(
+          subPath == null
+              ? directory
+              : Directory(pack_path.join(directory.absolute.path, subPath)),
+        );
 
   @override
   String toAbsoluteDirectory(String directory) =>
@@ -64,16 +71,23 @@ class StorageIO extends Storage {
   }
 
   @override
-  Future<bool> saveFileContent(
+  Future<String?> saveFileContent(
       String directoryPath, String name, Uint8List content) async {
     var file = _resolveFile(directoryPath, name);
     try {
+      root.createSync(recursive: true);
+
+      var fileParent = file.parent;
+      if (root.path != fileParent.path) {
+        fileParent.createSync(recursive: true);
+      }
+
       await file.writeAsBytes(content);
-      return true;
+      return file.path;
     } catch (e, s) {
       print(e);
       print(s);
-      return false;
+      return null;
     }
   }
 

@@ -1,0 +1,13 @@
+
+project_name:
+  description: The name of the project.
+  example: Simple App
+
+project_name_dir:
+  description: The project directory name.
+  example: simple_app
+
+project_description:
+  description: The project description for `pubspec.yaml`.
+  example: A simple project.
+  default: A project from template.
