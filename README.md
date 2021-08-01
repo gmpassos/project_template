@@ -72,7 +72,7 @@ Prepare to a `Zip` file:
 Show information about a Template (files, variables and manifest):
 
 ```bash
-  $> project_template info -t /tmp/template-x.json
+  $> project_template info -t /tmp/template-x.zip
 ```
 
 * -t: The template path.
@@ -81,6 +81,8 @@ Show information about a Template (files, variables and manifest):
     - Zip file: `path/to/template-x.zip`
     - Tar+gZip file: `path/to/template-x.tar.gz`
     - Tar file: `path/to/template-x.tar`
+    - JSON file: `path/to/template-x.json`
+    - YAML file: `path/to/template-x.yaml`
 
 
 ### create: 
@@ -88,7 +90,7 @@ Show information about a Template (files, variables and manifest):
 Create a file tree from a Template:
 
 ```bash
-  $> project_template create -t /tmp/template-x.json -p project_name_dir=foo -p project_name=Foo -p "project_description=Foo project." -p homepage=http://foo.com -o /tmp/project-x
+  $> project_template create -t /tmp/template-x.zip -p project_name_dir=foo -p project_name=Foo -p "project_description=Foo project." -p homepage=http://foo.com -o /tmp/project-x
 ```
 
 * -t: The template path.
@@ -97,6 +99,8 @@ Create a file tree from a Template:
         - Zip file: `path/to/template-x.zip`
         - Tar+gZip file: `path/to/template-x.tar.gz`
         - Tar file: `path/to/template-x.tar`
+        - JSON file: `path/to/template-x.json`
+        - YAML file: `path/to/template-x.yaml`
 * -p: A template property/variable definition.
 * -o: The output directory, where the project (file tree) will be generated.
 
