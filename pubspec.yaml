@@ -1,6 +1,6 @@
 name: project_template
 description: Tool to generate project templates for any programming language or framework.
-version: 1.0.0
+version: 1.0.1
 homepage: https://github.com/gmpassos/project_template
 
 environment:
@@ -16,6 +16,7 @@ dependencies:
   yaml: ^3.1.0
   yaml_writer: ^1.0.0
   async_extension: ^1.0.4
+  archive: ^3.1.2
 
 dev_dependencies:
   lints: ^1.0.1

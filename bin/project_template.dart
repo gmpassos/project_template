@@ -3,6 +3,7 @@ import 'dart:convert' as dart_convert;
 import 'dart:io';
 
 import 'package:args/args.dart';
+import 'package:path/path.dart' as pack_path;
 import 'package:args/command_runner.dart';
 import 'package:project_template/project_template.dart';
 import 'package:project_template/src/project_template_storage_io.dart';
@@ -86,46 +87,6 @@ abstract class CommandBase extends Command<bool> {
   }
 
   String readFile(String filePath) => File(filePath).readAsStringSync();
-
-  Future<Template> loadTemplate(String templatePath,
-      {List<String>? ignorePath, List<Pattern>? ignoreRegexp}) async {
-    var templatePathLC = templatePath.toLowerCase();
-
-    if (templatePathLC.endsWith('.json')) {
-      var data = readFile(templatePath);
-      var json = dart_convert.json.decode(data);
-      return Template.fromJson(json);
-    } else if (templatePathLC.endsWith('.yaml') ||
-        templatePathLC.endsWith('.yml')) {
-      var data = readFile(templatePath);
-      var yaml = loadYaml(data);
-      return Template.fromJson(yaml);
-    } else {
-      var storage = StorageIO.directoryPath(templatePath);
-
-      if (ignorePath != null) {
-        storage.ignorePaths.addAll(ignorePath);
-      }
-
-      if (ignoreRegexp != null) {
-        storage.ignorePaths.addAll(ignoreRegexp);
-      }
-
-      print('');
-
-      if (storage.ignorePaths.isNotEmpty) {
-        print('-- Template ignorePaths(${storage.ignorePaths.length}):');
-        for (var e in storage.ignorePaths) {
-          print('   $e');
-        }
-        print('');
-      }
-
-      print('-- Loading template:\n   ${storage.root.path}');
-
-      return await storage.loadTemplate();
-    }
-  }
 }
 
 abstract class CommandTemplateBase extends CommandBase {
@@ -175,6 +136,62 @@ abstract class CommandTemplateBase extends CommandBase {
       );
     }
   }
+
+  Future<Template> loadTemplate(String templatePath,
+      {List<String>? ignorePath, List<Pattern>? ignoreRegexp}) async {
+    var templatePathLC = templatePath.toLowerCase();
+
+    if (templatePathLC.endsWith('.json')) {
+      var data = readFile(templatePath);
+      var json = dart_convert.json.decode(data);
+      return Template.fromJson(json);
+    } else if (templatePathLC.endsWith('.yaml') ||
+        templatePathLC.endsWith('.yml')) {
+      var data = readFile(templatePath);
+      var yaml = loadYaml(data);
+      return Template.fromJson(yaml);
+    } else if (templatePathLC.endsWith('.zip')) {
+      var file = File(templatePath);
+      var storage = StorageZip.fromCompressed(file.readAsBytesSync());
+      return await _loadTemplateFromStorage(
+          storage, templatePath, ignorePath, ignoreRegexp);
+    } else if (templatePathLC.endsWith('.tar') ||
+        templatePathLC.endsWith('.tar.gz')) {
+      var file = File(templatePath);
+      var storage = StorageTarGzip.fromCompressed(file.readAsBytesSync());
+      return await _loadTemplateFromStorage(
+          storage, templatePath, ignorePath, ignoreRegexp);
+    } else {
+      var storage = StorageIO.directoryPath(templatePath);
+      return await _loadTemplateFromStorage(
+          storage, storage.root.path, ignorePath, ignoreRegexp);
+    }
+  }
+
+  Future<Template> _loadTemplateFromStorage(Storage storage, String storagePath,
+      List<String>? ignorePath, List<Pattern>? ignoreRegexp) async {
+    if (ignorePath != null) {
+      storage.ignorePaths.addAll(ignorePath);
+    }
+
+    if (ignoreRegexp != null) {
+      storage.ignorePaths.addAll(ignoreRegexp);
+    }
+
+    print('');
+
+    if (storage.ignorePaths.isNotEmpty) {
+      print('-- Template ignorePaths(${storage.ignorePaths.length}):');
+      for (var e in storage.ignorePaths) {
+        print('   $e');
+      }
+      print('');
+    }
+
+    print('-- Loading template:\n   $storagePath');
+
+    return await storage.loadTemplate();
+  }
 }
 
 class CommandInfo extends CommandTemplateBase {
@@ -189,7 +206,8 @@ class CommandInfo extends CommandTemplateBase {
       'template',
       abbr: 't',
       help: 'Template to use.',
-      valueHelp: './template_dir|template.yaml|template.json',
+      valueHelp:
+          './template_dir|template.yaml|template.json|template.zip|template.tar.gz',
     );
   }
 
@@ -240,7 +258,8 @@ class CommandCreate extends CommandTemplateBase {
       'template',
       abbr: 't',
       help: 'Template to use.',
-      valueHelp: './template_dir|template.yaml|template.json',
+      valueHelp:
+          './template_dir|template.yaml|template.json|template.zip|template.tar.gz',
     );
 
     argParser.addOption(
@@ -378,14 +397,14 @@ class CommandPrepare extends CommandTemplateBase {
       'directory',
       abbr: 'd',
       help: 'Template source directory.',
-      valueHelp: './template_source_dir',
+      valueHelp: './template_source_dir|template.zip|template.tar.gz',
     );
 
     argParser.addOption(
       'output',
       abbr: 'o',
       help: 'Template output file.',
-      valueHelp: 'template.yaml|template.json',
+      valueHelp: 'template.yaml|template.json|template.zip|template.tar.gz',
     );
   }
 
@@ -434,11 +453,32 @@ class CommandPrepare extends CommandTemplateBase {
 
     var ext = TemplateEntry.parseNameExtension(output).toLowerCase();
 
-    String encoded;
+    dynamic encoded;
     String format;
     if (ext == 'yml' || ext == 'yaml') {
       encoded = template.toYAMLEncoded();
       format = 'YAML';
+    } else if (ext == 'zip') {
+      var storage = StorageZip();
+      await template.saveTo(storage);
+      encoded = await storage.compress();
+      format = 'Zip';
+    } else if (ext == 'tar') {
+      var storage = StorageTarGzip();
+      await template.saveTo(storage);
+      encoded = await storage.compress(compressionLevel: 0);
+      format = 'tar';
+    } else if (ext == 'gz') {
+      var storage = StorageTarGzip();
+      await template.saveTo(storage);
+      encoded = await storage.compress();
+
+      var pathParts = pack_path.split(outputFile.path);
+      if (!pathParts.last.toLowerCase().endsWith('tar.gz')) {
+        _log('WARNING', 'Output file without `tar.gz` extension!');
+      }
+
+      format = 'tar+Gzip';
     } else {
       encoded = template.toJsonEncoded(pretty: true);
       format = 'JSON';
@@ -446,9 +486,14 @@ class CommandPrepare extends CommandTemplateBase {
 
     print('\n-- Format: $format');
 
-    outputFile.writeAsStringSync(encoded);
+    if (encoded is String) {
+      outputFile.writeAsStringSync(encoded);
+    } else {
+      outputFile.writeAsBytesSync(encoded);
+    }
 
-    print('\n-- Saved Template at: ${outputFile.path}\n');
+    print(
+        '\n-- Saved Template> size: ${outputFile.lengthSync()} ; path: ${outputFile.path}\n');
 
     return true;
   }

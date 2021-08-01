@@ -34,45 +34,131 @@ Now you can use the CLI directly:
   $> project_template --help
 ```
 
-To prepare a Template from a directory:
+## CLI Commands
+
+### prepare:
+
+Prepare a Template from a directory into a single file. The resulting file should be used by command `create`.
+
+Prepare to a `JSON` file:
 
 ```bash
   $> project_template prepare -d example/template-example -r ".DS_Store$" -o /tmp/template-x.json
 ```
 
-* -d: The template directory.
-* -r: A `RegExp` of a file path to ignore.
-* -o: The template file, to be used by `create` command (below).
+Prepare to a `Zip` file:
 
-To show information about a template:
+```bash
+  $> project_template prepare -d example/template-example -r ".DS_Store$" -o /tmp/template-x.zip
+```
+
+* -d: The Template directory/source.
+  * Source types:
+    - Directory: `path/to/template-directory`
+    - Zip file: `path/to/template-x.zip`
+    - Tar+gZip file: `path/to/template-x.tar.gz`
+    - Tar file: `path/to/template-x.tar`
+* -r: A `RegExp` of a file path to ignore.
+* -o: The prepared Template output file (to be used by `create` command below).
+  * Output File formats:
+    - JSON file: `path/to/template-x.json`
+    - YAML file: `path/to/template-x.yaml`
+    - Zip file: `path/to/template-x.zip`
+    - Tar+gZip file: `path/to/template-x.tar.gz`
+    - Tar file: `path/to/template-x.tar`
+
+### info:
+
+Show information about a Template (files, variables and manifest):
 
 ```bash
   $> project_template info -t /tmp/template-x.json
 ```
 
-To create a file tree from a Template:
+* -t: The template path.
+  * Path types:
+    - Directory: `path/to/template-directory`
+    - Zip file: `path/to/template-x.zip`
+    - Tar+gZip file: `path/to/template-x.tar.gz`
+    - Tar file: `path/to/template-x.tar`
+
+
+### create: 
+
+Create a file tree from a Template:
 
 ```bash
   $> project_template create -t /tmp/template-x.json -p project_name_dir=foo -p project_name=Foo -p "project_description=Foo project." -p homepage=http://foo.com -o /tmp/project-x
 ```
 
-* -t: The template file.
+* -t: The template path.
+    * Path types:
+        - Directory: `path/to/template-directory`
+        - Zip file: `path/to/template-x.zip`
+        - Tar+gZip file: `path/to/template-x.tar.gz`
+        - Tar file: `path/to/template-x.tar`
 * -p: A template property/variable definition.
 * -o: The output directory, where the project (file tree) will be generated.
 
 ## Library Usage
 
-A simple library usage example:
+Here's a simple example that loads a `Template` from a directory,
+resolves/builds it (with the `variables` definitions)
+and then saves it to a new directory.
 
 ```dart
-import 'package:project_template/project_template.dart';
+import 'dart:io';
+
+import 'package:project_template/src/project_template_storage_io.dart';
 
 void main() async {
+
+  var sourceDir = Directory('path/to/template-dir');
   
+  // The template storage:
+  var storage = StorageIO.directory(sourceDir)
+    ..ignoreFiles.add('.DS_Store');
 
+  // List files at storage:
+  var files = storage.listFiles();
+
+  // Load a Template using storage files:
+  var template = await storage.loadTemplate();
+
+  // Parse the Template files and identify the variables:
+  var variables = template.parseTemplateVariables();
+
+  // Return the Template manifest (`project_template.yaml`).
+  var manifest = template.getManifest();
+
+  // Define the variables to build a template: 
+  var variables = {
+    'project_name': 'Project X',
+    'project_name_dir': 'project_x',
+    'homepage': 'https://project-x.domain',
+  };
+
+  // Resolve/build the template:
+  var templateResolved = template.resolve(variables);
+
+  // Print all Template files as a YAML document:
+  print(templateResolved.toYAMLEncoded());
+
+  var saveDir = Directory('/path/to/workspace');
+  
+  // Save `templateResolved` files to `/path/to/workspace/project_x`:
+  var storageSave = StorageIO.directory(saveDir);
+  templateResolved.saveTo(storageSave, 'project_x');
+  
 }
-
 ```
+
+See the [example] for more.
+
+To use this library in your code, see the [API documentation][api_doc].
+
+[api_doc]: https://pub.dev/documentation/project_template/latest/
+[example]: ./example
 
 ## Features and bugs
 

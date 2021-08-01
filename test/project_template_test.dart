@@ -1,5 +1,8 @@
 import 'dart:convert' as dart_convert;
+import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:path/path.dart' as pack_path;
 import 'package:project_template/project_template.dart';
 import 'package:test/test.dart';
 
@@ -408,7 +411,7 @@ content: 'Hello!'
       expect(files[0].path, equals('foo/file1.txt'));
     });
 
-    test('basic', () async {
+    test('FileType extension', () async {
       expect(FileType.getExtensionType('txt'), equals('text/plain'));
       expect(FileType.getExtensionType('text'), equals('text/plain'));
       expect(FileType.getExtensionType('html'), equals('text/html'));
@@ -430,5 +433,73 @@ content: 'Hello!'
       expect(FileType.byExtension('png').isTextType, isFalse);
       expect(FileType.byExtension('png').isBinaryType, isTrue);
     });
+
+    test('zip', () async {
+      var zipFile = File(pack_path.join(
+        _getExampleDirectoryPath(),
+        'template-example.zip',
+      ));
+
+      var compressed = zipFile.readAsBytesSync();
+
+      await _testCompressed(compressed, (d) => StorageZip.fromCompressed(d));
+    });
+
+    test('tar+gzip', () async {
+      var tarGzFile = File(pack_path.join(
+        _getExampleDirectoryPath(),
+        'template-example.tar.gz',
+      ));
+
+      var compressed = tarGzFile.readAsBytesSync();
+
+      await _testCompressed(
+          compressed, (d) => StorageTarGzip.fromCompressed(d));
+    });
   });
+}
+
+Future<void> _testCompressed(Uint8List compressedData,
+    StorageCompressed Function(Uint8List data) decompressor) async {
+  print('>> compressedData: ${compressedData.length}');
+
+  var storage = decompressor(compressedData);
+
+  var filesPaths = storage.listFilesPaths()..sort();
+  print(filesPaths);
+
+  var expectedFilesPaths = [
+    '___project_name_dir___/.gitignore',
+    '___project_name_dir___/CHANGELOG.md',
+    '___project_name_dir___/README.md',
+    '___project_name_dir___/analysis_options.yaml',
+    '___project_name_dir___/bin/___project_name_dir___.dart',
+    '___project_name_dir___/project_template.yaml',
+    '___project_name_dir___/pubspec.yaml'
+  ];
+
+  expect(filesPaths, equals(expectedFilesPaths));
+
+  var compressedData2 = await storage.compress();
+
+  print('>> compressedData2: ${compressedData2.length}');
+
+  var storage2 = decompressor(compressedData2);
+
+  var filesPaths2 = storage2.listFilesPaths()..sort();
+  print(filesPaths2);
+
+  expect(filesPaths2, equals(expectedFilesPaths));
+}
+
+String _getExampleDirectoryPath() => _getExampleDirectory().path;
+
+Directory _getExampleDirectory() {
+  var currentDir = Directory.current.absolute;
+
+  var exampleDir = currentDir.path.endsWith('example')
+      ? currentDir
+      : Directory('${currentDir.path}/example');
+
+  return exampleDir.absolute;
 }
