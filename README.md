@@ -118,11 +118,11 @@ Prepare to a `Zip` file:
 * -r: A `RegExp` of a file path to ignore.
 * -o: The prepared Template output file (to be used by `create` command below).
   * Output File formats:
-    - JSON file: `path/to/template-x.json`
-    - YAML file: `path/to/template-x.yaml`
     - Zip file: `path/to/template-x.zip`
     - Tar+gZip file: `path/to/template-x.tar.gz`
     - Tar file: `path/to/template-x.tar`
+    - JSON file: `path/to/template-x.json`
+    - YAML file: `path/to/template-x.yaml`
 
 ### info:
 
@@ -144,7 +144,7 @@ Show information about a Template (files, variables and manifest):
 
 ### create: 
 
-Create a file tree from a Template:
+Create/build a file tree from a Template:
 
 ```bash
   $> project_template create -t /tmp/template-x.zip -p project_name_dir=foo -p project_name=Foo -p "project_description=Foo project." -p homepage=http://foo.com -o /tmp/project-x
@@ -254,7 +254,8 @@ void main(List<String> args) async {
         ..addCommand(CommandPrepare(cliTitle, _consolePrinter));
   
   var ok = await commandRunner.run(args) ;
-  
+
+  exit(ok ? 0 : 1);
 }
 ```
 
