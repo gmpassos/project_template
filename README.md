@@ -82,7 +82,7 @@ You can use the built-in command-line: `project_template`
 To activate it globally:
 
 ```bash
- $> dart pub global activate project_template
+  $> dart pub global activate project_template
 ```
 
 Now you can use the CLI directly:
