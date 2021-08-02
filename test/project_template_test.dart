@@ -6,6 +6,8 @@ import 'package:path/path.dart' as pack_path;
 import 'package:project_template/project_template.dart';
 import 'package:test/test.dart';
 
+import 'project_template_test_helper.dart';
+
 void main() {
   group('TemplateEntry', () {
     setUp(() {});
@@ -436,7 +438,7 @@ content: 'Hello!'
 
     test('zip', () async {
       var zipFile = File(pack_path.join(
-        _getExampleDirectoryPath(),
+        getExampleDirectoryPath(),
         'template-example.zip',
       ));
 
@@ -447,7 +449,7 @@ content: 'Hello!'
 
     test('tar+gzip', () async {
       var tarGzFile = File(pack_path.join(
-        _getExampleDirectoryPath(),
+        getExampleDirectoryPath(),
         'template-example.tar.gz',
       ));
 
@@ -490,16 +492,4 @@ Future<void> _testCompressed(Uint8List compressedData,
   print(filesPaths2);
 
   expect(filesPaths2, equals(expectedFilesPaths));
-}
-
-String _getExampleDirectoryPath() => _getExampleDirectory().path;
-
-Directory _getExampleDirectory() {
-  var currentDir = Directory.current.absolute;
-
-  var exampleDir = currentDir.path.endsWith('example')
-      ? currentDir
-      : Directory('${currentDir.path}/example');
-
-  return exampleDir.absolute;
 }

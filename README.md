@@ -13,6 +13,63 @@
 
 A tool to generate project templates and file trees for any programming language or framework.
 
+# Template Format
+
+To define a template just declare a file tree where variables will be in the format
+`___VAR_NAME___`. Variables will be detected in file paths and
+in file contents.
+
+Example of a Template file tree:
+```
+___project_name_dir___/.gitignore
+___project_name_dir___/bin/___project_name_dir___.dart
+___project_name_dir___/CHANGELOG.md
+___project_name_dir___/project_template.yaml
+___project_name_dir___/pubspec.yaml
+___project_name_dir___/README.md
+```
+
+Content example for the `README.md` entry above:
+
+```markdown
+# ___project_name___
+
+___project_description___
+
+## Usage
+
+CLI:
+
+`$> ___project_name_dir___ -h`
+
+## See Also
+
+- ___homepage___
+
+```
+
+## Project Manifest
+
+You can declare a project manifest at `project_template.yaml`:
+
+```yaml
+project_name:
+  description: The name of the project.
+  example: Simple App
+
+project_name_dir:
+  description: The project directory name.
+  example: simple_app
+
+project_description:
+  description: The project description for `pubspec.yaml`.
+  example: A simple project.
+  default: A project from template.
+```
+
+- Variables with a `default` value won't be mandatory when
+  using the CLI command `create`.
+
 # Usage
 
 The package can be used as a *__command-line interface (CLI)__* or as a *__Dart library__* to be imported
@@ -102,7 +159,12 @@ Create a file tree from a Template:
         - JSON file: `path/to/template-x.json`
         - YAML file: `path/to/template-x.yaml`
 * -p: A template property/variable definition.
-* -o: The output directory, where the project (file tree) will be generated.
+* -o: The output directory/zip/tar.gz (where the resolve project file tree will be generated).
+    * Output types:
+        - Directory: `path/to/template-directory`
+        - Zip file: `path/to/template-x.zip`
+        - Tar+gZip file: `path/to/template-x.tar.gz`
+        - Tar file: `path/to/template-x.tar`
 
 ## Library Usage
 
@@ -163,6 +225,42 @@ To use this library in your code, see the [API documentation][api_doc].
 
 [api_doc]: https://pub.dev/documentation/project_template/latest/
 [example]: ./example
+
+## CLI Library Usage
+
+The CLI classes, based on [Command][args_command] (used with [CommandRunner][args_command_runner]) of package [args][pack_args],
+are also exposed to be integrated with other projects and other CLI tools.
+
+Here's an example of a `tool-x` using `project_template_cli`:
+
+```dart
+import 'dart:io';
+
+import 'package:args/command_runner.dart';
+import 'package:project_template/project_template_cli.dart';
+
+void _consolePrinter(Object? o) {
+  print(o);
+}
+
+const String cliTitle = '[Tool-X/${Template.version}]';
+
+void main(List<String> args) async {
+  
+  var commandRunner =
+      CommandRunner<bool>('tool-x', '$cliTitle - CLI Tool')
+        ..addCommand(CommandInfo(cliTitle, _consolePrinter))
+        ..addCommand(CommandCreate(cliTitle, _consolePrinter))
+        ..addCommand(CommandPrepare(cliTitle, _consolePrinter));
+  
+  var ok = await commandRunner.run(args) ;
+  
+}
+```
+
+[pack_args]: https://pub.dev/packages/args
+[args_command]: https://pub.dev/documentation/args/latest/command_runner/Command-class.html
+[args_command_runner]: https://pub.dev/documentation/args/latest/command_runner/CommandRunner-class.html
 
 ## Features and bugs
 

@@ -1,3 +1,11 @@
+## 1.0.2
+
+- Library `project_template_cli`:
+  - CLI Command classes can be used in other projects now
+- Improved CLI tests.
+- Added `template-example.json` and `template-example.yaml`.
+- `README.md`: added template format description and CLI Library usage.
+
 ## 1.0.1
 
 - Added `StorageCompressed`:

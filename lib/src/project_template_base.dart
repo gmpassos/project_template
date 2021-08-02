@@ -132,8 +132,7 @@ class Template {
     var notDefinedVars = <String>{};
 
     for (var varName in parsedVars) {
-      if (!manifest.containsKey(varName) &&
-          _getVariable(variables, varName, defaultVarProvider) == null) {
+      if (_getVariable(variables, varName, defaultVarProvider) == null) {
         notDefinedVars.add(varName);
       }
     }
