@@ -41,7 +41,7 @@ void main() async {
   print('Manifest:\n');
 
   print(
-    YAMLWriter()
+    YamlWriter()
         .write(manifest)
         .split(RegExp(r'[\r\n]'))
         .map((l) => '  $l')

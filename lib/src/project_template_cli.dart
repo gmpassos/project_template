@@ -56,9 +56,8 @@ abstract class CommandBase extends Command<bool> {
 }
 
 abstract class CommandTemplateBase extends CommandBase {
-  CommandTemplateBase(String cliTitle, ConsolePrinter consolePrinter,
-      {bool allowIgnoreOptions = true})
-      : super(cliTitle, consolePrinter) {
+  CommandTemplateBase(super.cliTitle, super.consolePrinter,
+      {bool allowIgnoreOptions = true}) {
     if (allowIgnoreOptions) {
       argParser.addMultiOption(
         'ignore',
@@ -96,7 +95,7 @@ abstract class CommandTemplateBase extends CommandBase {
       printToConsole('\nMANIFEST:');
 
       printToConsole(
-        YAMLWriter()
+        YamlWriter()
             .write(manifest)
             .split(RegExp(r'[\r\n]'))
             .map((l) => '  $l')
@@ -169,8 +168,8 @@ class CommandInfo extends CommandTemplateBase {
   @override
   final String name = 'info';
 
-  CommandInfo(String cliTitle, ConsolePrinter consolePrinter)
-      : super(cliTitle, consolePrinter, allowIgnoreOptions: false) {
+  CommandInfo(super.cliTitle, super.consolePrinter)
+      : super(allowIgnoreOptions: false) {
     argParser.addOption(
       'template',
       abbr: 't',
@@ -222,8 +221,7 @@ class CommandCreate extends CommandTemplateBase {
   @override
   final String name = 'create';
 
-  CommandCreate(String cliTitle, ConsolePrinter consolePrinter)
-      : super(cliTitle, consolePrinter) {
+  CommandCreate(super.cliTitle, super.consolePrinter) {
     argParser.addOption(
       'template',
       abbr: 't',
@@ -379,8 +377,7 @@ class CommandPrepare extends CommandTemplateBase {
   @override
   final String name = 'prepare';
 
-  CommandPrepare(String cliTitle, ConsolePrinter consolePrinter)
-      : super(cliTitle, consolePrinter) {
+  CommandPrepare(super.cliTitle, super.consolePrinter) {
     argParser.addOption(
       'directory',
       abbr: 'd',

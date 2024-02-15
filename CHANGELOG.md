@@ -1,3 +1,20 @@
+## 1.1.0
+
+Dart 3.3.0 compatibility fixes.
+
+- path: ^1.9.0
+- args: ^2.4.2
+- collection: ^1.18.0
+- yaml: ^3.1.2
+- yaml_writer: ^2.0.0
+- async_extension: ^1.2.5
+- archive: ^3.4.10
+
+- lints: ^3.0.0
+- test: ^1.25.2
+- dependency_validator: ^3.2.3
+- coverage: ^1.7.2
+
 ## 1.0.2
 
 - Library `project_template_cli`:
