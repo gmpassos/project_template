@@ -664,7 +664,7 @@ String _resolveTemplateString(Map<String, dynamic> variables, String s,
 }
 
 String _encodeYAML(dynamic o) {
-  return YAMLWriter().write(o);
+  return YamlWriter().write(o);
 }
 
 String _encodeJSON(dynamic o, bool pretty) {

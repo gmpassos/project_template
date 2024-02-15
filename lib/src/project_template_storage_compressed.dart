@@ -24,8 +24,8 @@ class StorageZip extends StorageCompressed {
       : super(_instantiateCompressor, archive: archive);
 }
 
-class _StorageCompressorZip extends _StorageCompressor {
-  _StorageCompressorZip(StorageMemory storage) : super(storage);
+class _StorageCompressorZip extends StorageCompressor {
+  _StorageCompressorZip(super.storage);
 
   @override
   String get algorithm => 'Zip';
@@ -81,8 +81,8 @@ class StorageTarGzip extends StorageCompressed {
       : super(_instantiateCompressor, archive: archive);
 }
 
-class _StorageCompressorTarGzip extends _StorageCompressor {
-  _StorageCompressorTarGzip(StorageMemory storage) : super(storage);
+class _StorageCompressorTarGzip extends StorageCompressor {
+  _StorageCompressorTarGzip(super.storage);
 
   @override
   String get algorithm => 'Tar+Gzip';
@@ -129,10 +129,10 @@ class _StorageCompressorTarGzip extends _StorageCompressor {
 }
 
 abstract class StorageCompressed extends StorageMemory {
-  late final _StorageCompressor _compressor;
+  late final StorageCompressor _compressor;
 
   StorageCompressed(
-      _StorageCompressor Function(StorageCompressed storage)
+      StorageCompressor Function(StorageCompressed storage)
           compressorInstantiator,
       {Uint8List? compressedData,
       Archive? archive}) {
@@ -178,10 +178,10 @@ abstract class StorageCompressed extends StorageMemory {
   }
 }
 
-abstract class _StorageCompressor {
+abstract class StorageCompressor {
   final StorageMemory storage;
 
-  _StorageCompressor(this.storage);
+  StorageCompressor(this.storage);
 
   String get algorithm;
 
