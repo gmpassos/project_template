@@ -3,7 +3,7 @@
 [![pub package](https://img.shields.io/pub/v/project_template.svg?logo=dart&logoColor=00b9fc)](https://pub.dartlang.org/packages/project_template)
 [![Null Safety](https://img.shields.io/badge/null-safety-brightgreen)](https://dart.dev/null-safety)
 [![Codecov](https://img.shields.io/codecov/c/github/gmpassos/project_template)](https://app.codecov.io/gh/gmpassos/project_template)
-[![CI](https://img.shields.io/github/workflow/status/gmpassos/project_template/Dart%20CI/master?logo=github-actions&logoColor=white)](https://github.com/gmpassos/project_template/actions)
+[![Dart CI](https://github.com/gmpassos/project_template/actions/workflows/dart.yml/badge.svg?branch=master)](https://github.com/gmpassos/project_template/actions/workflows/dart.yml)
 [![GitHub Tag](https://img.shields.io/github/v/tag/gmpassos/project_template?logo=git&logoColor=white)](https://github.com/gmpassos/project_template/releases)
 [![New Commits](https://img.shields.io/github/commits-since/gmpassos/project_template/latest?logo=git&logoColor=white)](https://github.com/gmpassos/project_template/network)
 [![Last Commits](https://img.shields.io/github/last-commit/gmpassos/project_template?logo=git&logoColor=white)](https://github.com/gmpassos/project_template/commits/master)

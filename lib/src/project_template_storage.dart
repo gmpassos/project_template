@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert' as dart_convert;
 import 'dart:typed_data';
 
@@ -144,8 +143,8 @@ class _MemoryFileStore extends FileStorage {
   final dynamic content;
 
   _MemoryFileStore.relative(
-      Storage storage, String directory, String name, this.content)
-      : super.relative(storage, directory, name);
+      super.storage, super.directory, super.name, this.content)
+      : super.relative();
 
   @override
   FutureOr<Uint8List> getContentAsBytes() async {
