@@ -1,4 +1,4 @@
-# 1.1.1
+## 1.1.1
 
 - Fix usage of `archive: ^4.0.4`.
 
