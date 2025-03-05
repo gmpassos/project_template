@@ -1,3 +1,20 @@
+# 1.1.1
+
+- sdk: '>=3.6.0 <4.0.0'
+
+- path: ^1.9.1
+- args: ^2.6.0
+- collection: ^1.19.0
+- yaml: ^3.1.3
+- yaml_writer: ^2.1.0
+- async_extension: ^1.2.14
+- archive: ^4.0.4
+
+- lints: ^5.1.1
+- test: ^1.25.15
+- dependency_validator: ^5.0.2
+- coverage: ^1.11.1
+
 ## 1.1.0
 
 Dart 3.3.0 compatibility fixes.
