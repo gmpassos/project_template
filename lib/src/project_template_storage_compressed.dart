@@ -51,7 +51,7 @@ class _StorageCompressorZip extends StorageCompressor {
     zipEncoder.startEncode(output, level: compressionLevel);
 
     for (var f in arquiveFiles) {
-      zipEncoder.addFile(f);
+      zipEncoder.add(f);
     }
 
     zipEncoder.endEncode();
@@ -123,7 +123,7 @@ class _StorageCompressorTarGzip extends StorageCompressor {
     checkCompressionLevel(compressionLevel);
 
     var gZipEncoder = GZipEncoder();
-    var bytes = gZipEncoder.encode(tarData, level: compressionLevel)!;
+    var bytes = gZipEncoder.encode(tarData, level: compressionLevel);
     return bytes;
   }
 }
@@ -209,7 +209,6 @@ abstract class StorageCompressor {
       var content = await e.getContentAsBytes();
 
       var archiveFile = ArchiveFile(e.path, content.length, content);
-      archiveFile.compress = true;
 
       list.add(archiveFile);
     }
@@ -230,7 +229,7 @@ abstract class StorageCompressor {
 
   Future<Uint8List> compressArquive({int compressionLevel = 4}) async {
     var arquiveFiles = await listArquiveFiles();
-    var output = OutputStream();
+    var output = OutputMemoryStream();
 
     var bytes = compressArquiveFiles(output, compressionLevel, arquiveFiles);
 
