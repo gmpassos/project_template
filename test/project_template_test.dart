@@ -48,11 +48,11 @@ void main() {
               '{"directory":"foo","name":"file.txt","type":"text","encode":"text","content":"Hello!"}'));
 
       expect(templateEntry.toYAMLEncoded(), equals('''
-directory: 'foo'
-name: 'file.txt'
-type: 'text'
-encode: 'text'
-content: 'Hello!'
+directory: "foo"
+name: "file.txt"
+type: "text"
+encode: "text"
+content: "Hello!"
 '''));
 
       expect(TemplateEntry.fromJson(templateEntry.toJson()),
@@ -355,21 +355,21 @@ content: 'Hello!'
       print('---------------------------------------');
 
       expect(template.toYAMLEncoded(), equals('''
-- directory: ''
-  name: '___root___.txt'
-  type: 'text'
-  encode: 'text'
-  content: 'Hi!'
-- directory: '___pack___'
-  name: 'file___fid___.txt'
-  type: 'text'
-  encode: 'text'
-  content: '___hello___ Map: ___map/a___, ___map/b___ ; List: ___list/0___, ___list/1___'
-- directory: ''
-  name: 'project_template.json'
-  type: 'text'
-  encode: 'text'
-  content: '{"root":{"description": "Root file"}, "pack":{"description": "Pack dir"}}'
+- directory: ""
+  name: "___root___.txt"
+  type: "text"
+  encode: "text"
+  content: "Hi!"
+- directory: "___pack___"
+  name: "file___fid___.txt"
+  type: "text"
+  encode: "text"
+  content: "___hello___ Map: ___map/a___, ___map/b___ ; List: ___list/0___, ___list/1___"
+- directory: ""
+  name: "project_template.json"
+  type: "text"
+  encode: "text"
+  content: "{\\"root\\":{\\"description\\": \\"Root file\\"}, \\"pack\\":{\\"description\\": \\"Pack dir\\"}}"
 '''));
 
       expect(template.mainEntryPath, equals(''));
